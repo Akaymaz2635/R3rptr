@@ -25,6 +25,25 @@ def select_folder():
         #process_csv_files(folder_path)
     
 
+#############################################################
+    # Sütun adlarından grup ismi oluştur
+    df['Element'] = df['Element'].str.split('_').str[0]
+
+    # Gruplar oluştur ve en küçük ve en büyük değerleri hesapla
+    result = df.groupby('Element').agg({
+        'Tol-': 'first',
+        'Tol+': 'first',
+        'Check': lambda x: f"{x.min()} / {x.max()}"
+    }).reset_index()
+
+    # Sonucu aynı Excel dosyasının aynı sayfasına yazdır
+    with pd.ExcelWriter(output_path_excel, engine='openpyxl', mode='a') as writer:
+        result.to_excel(writer, sheet_name='Sheet1', index=False)
+#############################################################
+
+
+
+
 # Function to handle button2 click event
 def select_word_document():
     word_file_path = filedialog.askopenfilename(
