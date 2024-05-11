@@ -38,7 +38,7 @@ def select_folder():
 
     # Sonucu aynı Excel dosyasının aynı sayfasına yazdır
     with pd.ExcelWriter(output_path_excel, engine='openpyxl', mode='a') as writer:
-        result.to_excel(writer, sheet_name='Sheet1', index=False)
+        result.to_excel(writer, sheet_name='Reduced', index=False)
 #############################################################
 
 
