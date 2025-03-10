@@ -1,0 +1,286 @@
+# Bu güncellemeleri TableViewer sınıfının on_table_select metodunda uygulamalısınız
+
+def on_table_select(self, table_name):
+    """
+    Handle table selection and display the selected table
+    
+    Args:
+        table_name (str): Selected table name
+    """
+    try:
+        # Get table index
+        self.selected_table_idx = int(table_name.split(" ")[1]) - 1
+        
+        # Clear previous table display
+        for widget in self.table_display_frame.winfo_children():
+            widget.destroy()
+        
+        # Clear previous widgets dictionary
+        self.widgets = {}
+        
+        # Get table data
+        if self.selected_table_idx < len(self.table_reader.table_data):
+            table_data = self.table_reader.table_data[self.selected_table_idx]
+            has_actual = self.table_reader.table_has_actual[self.selected_table_idx]
+            
+            # Check if table has data
+            if not table_data:
+                ctk.CTkLabel(
+                    self.table_display_frame,
+                    text="Tablo boş.",
+                    font=("Helvetica", 16)
+                ).pack(pady=50)
+                return
+            
+            # Get headers
+            self.headers = table_data[0]
+            
+            # Get column indices
+            self.col_indices = self.table_reader.get_column_indices(self.headers)
+            
+            # Check if required columns exist
+            if self.col_indices['actual'] == -1 or self.col_indices['item_no'] == -1 or self.col_indices['dimension'] == -1:
+                ctk.CTkLabel(
+                    self.table_display_frame,
+                    text="Gerekli sütunlar bulunamadı (ACTUAL, ITEM NO veya DIMENSION).",
+                    font=("Helvetica", 16)
+                ).pack(pady=50)
+                return
+            
+            # Create scrollable frame for table - fill parent frame
+            scroll_frame = ctk.CTkScrollableFrame(
+                self.table_display_frame,
+            )
+            scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            # Calculate optimal column widths based on content
+            col_widths = self._calculate_optimal_column_widths(table_data)
+            
+            # Create table header
+            header_frame = ctk.CTkFrame(scroll_frame, corner_radius=0)
+            header_frame.pack(fill="x", pady=(0, 5))
+            
+            # Create header labels
+            for i, header in enumerate(self.headers):
+                frame = ctk.CTkFrame(header_frame, corner_radius=0)
+                frame.grid(row=0, column=i, padx=1, pady=1, sticky="nsew")
+                
+                ctk.CTkLabel(
+                    frame,
+                    text=header,
+                    font=("Helvetica", 14, "bold"),
+                    width=col_widths[i],
+                    height=30
+                ).pack(fill="both", expand=True)
+            
+            # Configure grid
+            for i in range(len(self.headers)):
+                header_frame.grid_columnconfigure(i, weight=0, minsize=col_widths[i])
+            
+            # Create data rows
+            for row_idx, row in enumerate(table_data[1:], 1):  # Skip header
+                row_frame = ctk.CTkFrame(scroll_frame, corner_radius=0)
+                row_frame.pack(fill="x", pady=1)
+                
+                # Fill row with data
+                for col_idx, cell in enumerate(row):
+                    if col_idx < len(self.headers):  # Ensure we don't go out of bounds
+                        cell_frame = ctk.CTkFrame(row_frame, corner_radius=0)
+                        cell_frame.grid(row=0, column=col_idx, padx=1, pady=1, sticky="nsew")
+                        
+                        # Handle ACTUAL column differently
+                        if col_idx == self.col_indices['actual'] and has_actual:
+                            # Get dimension and item_no for key
+                            dimension = row[self.col_indices['dimension']] if self.col_indices['dimension'] < len(row) else ""
+                            item_no = row[self.col_indices['item_no']] if self.col_indices['item_no'] < len(row) else ""
+                            
+                            # Create key for actual values
+                            key = f"{dimension}_{item_no}"
+                            
+                            # Create entry for ACTUAL value
+                            entry = ctk.CTkEntry(
+                                cell_frame,
+                                font=("Helvetica", 14),
+                                width=col_widths[col_idx]-25,  # Leave space for detail button
+                                height=28
+                            )
+                            entry.grid(row=0, column=0, sticky="nsew")
+                            
+                            # Store entry in widgets dictionary
+                            self.widgets[key] = entry
+                            
+                            # Load value if exists
+                            if key in self.actual_values:
+                                entry.delete(0, "end")
+                                entry.insert(0, self.actual_values[key])
+                            
+                            # Create button for lot details
+                            detail_button = ctk.CTkButton(
+                                cell_frame,
+                                text="...",
+                                font=("Helvetica", 10),
+                                width=20,
+                                height=28,
+                                corner_radius=4,
+                                command=lambda r=row_idx, i=item_no, d=dimension, e=entry, k=key: 
+                                        self.lot_detail_manager.show_lot_detail_dialog(r, i, d, e.get(), self.widgets)
+                            )
+                            detail_button.grid(row=0, column=1, sticky="ns")
+                            
+                            # Configure grid
+                            cell_frame.grid_columnconfigure(0, weight=1)
+                            cell_frame.grid_columnconfigure(1, weight=0)
+                        else:
+                            # Regular label for other cells
+                            ctk.CTkLabel(
+                                cell_frame,
+                                text=cell,
+                                font=("Helvetica", 14),
+                                width=col_widths[col_idx],
+                                height=30,
+                                anchor="w",
+                                padx=5
+                            ).pack(fill="both", expand=True)
+                
+                # Configure grid for consistent column widths
+                for i in range(len(self.headers)):
+                    if i < len(self.headers):  # Ensure we don't go out of bounds
+                        row_frame.grid_columnconfigure(i, weight=0, minsize=col_widths[i])
+            
+            logger.info(f"Displayed table {self.selected_table_idx + 1}")
+        else:
+            ctk.CTkLabel(
+                self.table_display_frame,
+                text=f"Tablo {self.selected_table_idx + 1} bulunamadı.",
+                font=("Helvetica", 16)
+            ).pack(pady=50)
+    
+    except Exception as e:
+        logger.error(f"Error displaying table: {str(e)}")
+        messagebox.showerror("Error", f"Error displaying table: {str(e)}")
+
+def _calculate_optimal_column_widths(self, table_data):
+    """
+    Calculate optimal column widths based on content
+    
+    Args:
+        table_data (list): Table data
+        
+    Returns:
+        list: List of column widths
+    """
+    # Initialize with minimum widths based on header length
+    num_cols = len(table_data[0])
+    col_widths = [0] * num_cols
+    
+    # Iterate through each cell to find the max content length per column
+    for row in table_data:
+        for col_idx, cell in enumerate(row):
+            if col_idx < num_cols:  # Ensure we don't go out of bounds
+                # Approximate width needed (characters * average character width)
+                # This is an approximation - different fonts have different character widths
+                cell_len = len(str(cell)) * 8  # 8 pixels per character is an approximation
+                
+                # Update if needed
+                if cell_len > col_widths[col_idx]:
+                    col_widths[col_idx] = cell_len
+    
+    # Set minimum and maximum widths
+    for i in range(len(col_widths)):
+        if col_widths[i] < 60:  # Minimum width
+            col_widths[i] = 60
+        elif col_widths[i] > 300:  # Maximum width
+            col_widths[i] = 300
+    
+    # Special considerations for specific columns
+    for i, header in enumerate(self.headers):
+        header_text = header.upper()
+        
+        # ACTUAL column needs extra width for the button
+        if "ACTUAL" in header_text:
+            col_widths[i] = max(col_widths[i], 150)  # Ensure ACTUAL column has enough width
+        # DIMENSION usually needs more space
+        elif "DIMENSION" in header_text:
+            col_widths[i] = max(col_widths[i], 200)  # Ensure DIMENSION has enough width
+    
+    return col_widths
+
+# Ayrıca TableViewer._setup_table_tab metodunu güncelleyerek 
+# tablo gösterme alanının tüm kullanılabilir alanı kullanmasını sağlayın:
+
+def _setup_table_tab(self):
+    """Set up the table viewing tab"""
+    # Table frame - fill the entire tab
+    self.table_content_frame = ctk.CTkFrame(self.tab_table, corner_radius=8)
+    self.table_content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+    
+    # Title
+    ctk.CTkLabel(
+        self.table_content_frame, 
+        text="Tablo Görüntüleme", 
+        font=("Helvetica", 20, "bold")
+    ).pack(pady=(20, 15))  # Reduced bottom padding
+    
+    # Table selector frame
+    self.table_selector_frame = ctk.CTkFrame(self.table_content_frame, corner_radius=0)
+    self.table_selector_frame.pack(fill="x", padx=40, pady=(0, 10))  # Reduced padding
+    
+    # Table selector label
+    ctk.CTkLabel(
+        self.table_selector_frame,
+        text="Tablo Seçiniz:",
+        font=("Helvetica", 14)
+    ).pack(side="left", padx=(0, 10))
+    
+    # Table selector
+    self.table_selector = ctk.CTkComboBox(
+        self.table_selector_frame, 
+        values=[], 
+        font=("Helvetica", 14),
+        width=200, 
+        height=30, 
+        corner_radius=6,
+        command=self.on_table_select
+    )
+    self.table_selector.pack(side="left", padx=10)
+    
+    # Hide initially
+    self.table_selector_frame.pack_forget()
+    
+    # Create a frame for the table content - use most of the available space
+    self.table_display_frame = ctk.CTkFrame(self.table_content_frame, corner_radius=8)
+    self.table_display_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+    
+    # Initial message
+    self.table_initial_message = ctk.CTkLabel(
+        self.table_display_frame,
+        text="Lütfen önce bir Word dosyası seçiniz.",
+        font=("Helvetica", 16)
+    )
+    self.table_initial_message.pack(pady=50)
+    
+    # Navigation buttons - minimal space
+    nav_frame = ctk.CTkFrame(self.table_content_frame, corner_radius=0)
+    nav_frame.pack(fill="x", padx=40, pady=(0, 10))  # Reduced padding
+    
+    # Back to project button
+    ctk.CTkButton(
+        nav_frame, 
+        text="Proje Bilgilerine Dön", 
+        font=("Helvetica", 14),
+        width=180, 
+        height=35, 
+        corner_radius=8,
+        command=lambda: self.tabview.set("Proje Bilgileri")
+    ).pack(side="left", padx=10)
+    
+    # Go to report button
+    ctk.CTkButton(
+        nav_frame, 
+        text="Rapor Oluşturmaya Geç", 
+        font=("Helvetica", 14),
+        width=180, 
+        height=35, 
+        corner_radius=8,
+        command=lambda: self.tabview.set("Rapor Oluşturma")
+    ).pack(side="right", padx=10)
