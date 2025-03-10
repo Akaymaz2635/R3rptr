@@ -1,0 +1,41 @@
+def update_table_selector(self):
+    """Update the table selector dropdown with available tables"""
+    if self.table_reader.table_data:
+        # Create a list of table names, but only for tables with ACTUAL column
+        table_names = []
+        for i, has_actual in enumerate(self.table_reader.table_has_actual):
+            if has_actual:
+                table_names.append(f"Tablo {i+1}")
+        
+        if table_names:
+            self.table_selector.configure(values=table_names)
+            self.table_selector.set(table_names[0])
+            
+            # Update selected table index to match the first table with ACTUAL column
+            first_actual_index = self.table_reader.table_has_actual.index(True)
+            self.selected_table_idx = first_actual_index
+        else:
+            # No tables with ACTUAL column found
+            self.table_selector.configure(values=["Uygun tablo bulunamadı"])
+            self.table_selector.set("Uygun tablo bulunamadı")
+            messagebox.showwarning("Uyarı", "Bu dosyada ACTUAL sütunu içeren tablo bulunamadı!")
+########
+
+def on_table_select(self, choice):
+    """Handle table selection from dropdown"""
+    try:
+        selected_text = self.table_selector.get()
+        if "Uygun tablo bulunamadı" in selected_text:
+            return
+            
+        table_idx = int(selected_text.split()[1]) - 1
+        
+        # Find the actual index in the table_data array
+        actual_indices = [i for i, has_actual in enumerate(self.table_reader.table_has_actual) if has_actual]
+        if table_idx < len(actual_indices):
+            actual_idx = actual_indices[table_idx]
+            self.selected_table_idx = actual_idx
+            self.show_table()
+            self.update_report_info()
+    except Exception as e:
+        logger.error(f"Error selecting table: {str(e)}")
