@@ -285,7 +285,7 @@ class LotDetailManager:
     
     def export_lot_details_to_text(self, folder_path, project_info):
         """
-        Export lot details to a text file. If file already exists, append new details.
+        Export lot details to a text file using a tabular format.
         
         Args:
             folder_path (str): Path to save the file
@@ -317,8 +317,6 @@ class LotDetailManager:
                 
                 logger.info(f"Found {len(existing_keys)} existing keys in lot_details.txt")
                 
-                # We'll append to the existing file later, so start with empty content
-                # for the new entries
             except Exception as e:
                 logger.error(f"Error reading existing lot details: {str(e)}")
                 file_exists = False
@@ -326,57 +324,77 @@ class LotDetailManager:
         # If file doesn't exist, include project info header
         if not file_exists:
             # Add project info header
+            lot_details_content.append("=" * 80)
+            lot_details_content.append("PROJE BİLGİLERİ".center(80))
+            lot_details_content.append("=" * 80)
+            lot_details_content.append("")
+            
+            # Format project info in a tabular way
             for key, value in project_info.items():
-                lot_details_content.append(f"{key}: {value}")
+                lot_details_content.append(f"{key:20}: {value}")
             
             lot_details_content.append("")
-            lot_details_content.append("LOT DETAYLARI:")
-            lot_details_content.append("=" * 40)
+            lot_details_content.append("=" * 80)
+            lot_details_content.append("LOT DETAYLARI".center(80))
+            lot_details_content.append("=" * 80)
             lot_details_content.append("")
         else:
             # For appending, just add a separator
-            lot_details_content.append("")
-            lot_details_content.append("-" * 40)
-            lot_details_content.append("")
+            lot_details_content.append("=" * 80)
             
             # Add current timestamp to show when this update happened
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            lot_details_content.append(f"Güncelleme Tarihi: {timestamp}")
+            lot_details_content.append(f"Güncelleme Tarihi: {timestamp}".center(80))
+            lot_details_content.append("=" * 80)
             lot_details_content.append("")
         
         # Add lot details for keys that aren't already in the file
         has_new_details = False
-        for key in self.part_quantities.keys():
-            # Skip keys that already exist in the file
-            if key in existing_keys:
-                continue
-                
+        
+        # Group the keys in pairs for side-by-side display
+        keys_to_process = [k for k in self.part_quantities.keys() if k not in existing_keys]
+        
+        # Process each key and format in a more compact way
+        for key in keys_to_process:
             has_new_details = True
             actual_value = self.parent.actual_values.get(key, "")
-            
-            lot_details_content.append(f"{key}")
-            lot_details_content.append(f"ACTUAL Değeri: {actual_value}")
-            
-            # Part quantity
             quantity = self.part_quantities.get(key, "0")
-            lot_details_content.append(f"Parça Miktarı: {quantity}")
-            
-            # Part numbers
             part_numbers = self.part_numbers.get(key, {})
-            if part_numbers:
-                lot_details_content.append("Parça Numaraları:")
-                for part_idx, part_num in part_numbers.items():
-                    if part_num and part_num.strip():
-                        lot_details_content.append(f"{part_idx}- {part_num}")
-            
-            # Notes
             notes = self.lot_notes.get(key, "")
+            
+            # Add key as header
+            lot_details_content.append(f"● {key} ●".center(80))
+            lot_details_content.append("-" * 80)
+            
+            # Create a two-column layout
+            lot_details_content.append(f"{'ACTUAL Değeri:':<20} {actual_value:<30}{'Parça Miktarı:':<15} {quantity}")
+            
+            # Prepare part numbers in a more organized way
+            if part_numbers:
+                lot_details_content.append("")
+                lot_details_content.append("Parça Numaraları:".center(80))
+                
+                # Display part numbers in a more table-like format
+                rows = []
+                for i in range(1, int(quantity) + 1, 2):
+                    if str(i) in part_numbers and i+1 <= int(quantity) and str(i+1) in part_numbers:
+                        rows.append(f"{i:2}- {part_numbers[str(i)]:<35} {i+1:2}- {part_numbers[str(i+1)]}")
+                    elif str(i) in part_numbers:
+                        rows.append(f"{i:2}- {part_numbers[str(i)]}")
+                
+                for row in rows:
+                    lot_details_content.append(row)
+            
+            # Add notes if present
             if notes:
-                lot_details_content.append("Notlar:")
-                lot_details_content.append(f"{notes}")
+                lot_details_content.append("")
+                lot_details_content.append("Notlar:".center(80))
+                # Wrap notes at 78 characters for better presentation
+                for i in range(0, len(notes), 78):
+                    lot_details_content.append(notes[i:i+78])
             
             lot_details_content.append("")
-            lot_details_content.append("-" * 40)
+            lot_details_content.append("-" * 80)
             lot_details_content.append("")
         
         # Write to file if we have new details or if file doesn't exist
@@ -555,11 +573,11 @@ class LotDetailManager:
 
     def add_lot_details_to_word(self, doc, lot_details_content):
         """
-        Add lot details to a Word document
+        Add lot details to a Word document in a more space-efficient tabular layout
         
         Args:
             doc: The Word document object
-            lot_details_content: List of content lines
+            lot_details_content: List of content lines  
                 
         Returns:
             bool: True if successful, False otherwise
@@ -568,95 +586,245 @@ class LotDetailManager:
             # Add page break before lot details
             doc.add_paragraph().runs[0].add_break(docx.enum.text.WD_BREAK.PAGE)
             
-            # Add title
-            p = doc.add_paragraph()
-            p.add_run("LOT DETAYLARI").bold = True
-            p.style = 'Heading 1'
-            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
-            
-            # Add content
-            in_project_info = True  # First section is project info
+            # Process content by sections
+            section_start = False
+            in_project_info = True
+            current_key = None
+            current_section = []
             
             for line in lot_details_content:
-                # Switch from project info to lot details
-                if line.startswith("LOT DETAYLARI:"):
+                # Check for section start/end markers
+                if line.startswith("====="):
+                    if "LOT DETAYLARI" in line or line.strip() == "=" * 80:
+                        # This is a major section separator
+                        
+                        # If we were collecting a section, add it now
+                        if current_section:
+                            if in_project_info:
+                                self._add_project_info_to_word(doc, current_section)
+                                in_project_info = False
+                            else:
+                                self._add_update_timestamp_to_word(doc, current_section)
+                            
+                            current_section = []
+                        
+                        # Start a new section if this is the LOT DETAYLARI header
+                        if "LOT DETAYLARI" in line:
+                            # Add LOT DETAYLARI header
+                            p = doc.add_paragraph()
+                            p.add_run("LOT DETAYLARI").bold = True
+                            p.style = 'Heading 1'
+                            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+                            
+                            # Add a horizontal line
+                            border = p.paragraph_format.border
+                            border.bottom.style = docx.enum.text.WD_BORDER_STYLE.SINGLE
+                            border.bottom.width = docx.shared.Pt(1)
+                        
+                        continue
+                
+                # Check for key markers (● KEY ●)
+                if line.strip().startswith("●") and line.strip().endswith("●"):
+                    # If we were collecting a section, add it now
+                    if current_section and current_key:
+                        self._add_lot_detail_section_to_word(doc, current_key, current_section)
+                    
+                    # Extract the new key
+                    current_key = line.strip().replace("●", "").strip()
+                    current_section = []
+                    continue
+                
+                # Check for update timestamp
+                if "Güncelleme Tarihi:" in line:
+                    # Start collecting update timestamp section
+                    current_section = [line]
                     in_project_info = False
+                    current_key = None
                     continue
-                    
-                if line.startswith("="):
-                    # Main separator - add a horizontal line
-                    p = doc.add_paragraph()
-                    p.add_run("_" * 40).bold = True
+                
+                # Collect project info lines
+                if in_project_info and not line.startswith("="):
+                    current_section.append(line)
                     continue
-                    
-                elif line.startswith("-"):
-                    # Sub-separator - just add a line
-                    p = doc.add_paragraph()
-                    p.add_run("_" * 30)
-                    continue
-                    
-                elif not line:
-                    # Empty line
-                    doc.add_paragraph()
-                    continue
-                    
-                elif in_project_info:
-                    # Project info in bold
-                    p = doc.add_paragraph()
-                    run = p.add_run(line)
-                    run.bold = True
-                    continue
-                    
-                elif line.startswith("Güncelleme Tarihi:"):
-                    # Update timestamp in bold and italic
-                    p = doc.add_paragraph()
-                    run = p.add_run(line)
-                    run.bold = True
-                    run.italic = True
-                    continue
-                    
-                elif "_" in line and not line.startswith(" ") and not ":" in line:
-                    # Key line (e.g., "6.3 RA_KN998") - make it stand out
-                    p = doc.add_paragraph()
-                    run = p.add_run(line)
-                    run.bold = True
-                    run.font.size = docx.shared.Pt(14)
-                    p.style = 'Heading 2'
-                    continue
-                    
-                elif line == "Parça Numaraları:" or line == "Notlar:":
-                    # Section headers - make them stand out
-                    p = doc.add_paragraph()
-                    run = p.add_run(line)
-                    run.bold = True
-                    run.font.size = docx.shared.Pt(12)
-                    continue
-                    
-                elif line.startswith("ACTUAL Değeri:") or line.startswith("Parça Miktarı:"):
-                    # Important values - make them bold
-                    p = doc.add_paragraph()
-                    parts = line.split(":", 1)
-                    if len(parts) == 2:
-                        run = p.add_run(parts[0] + ":")
-                        run.bold = True
-                        p.add_run(parts[1])
-                    else:
-                        p.add_run(line)
-                    continue
-                    
-                else:
-                    # Normal content
-                    doc.add_paragraph(line)
+                
+                # Collect lot detail section lines
+                if current_key is not None:
+                    current_section.append(line)
+            
+            # Add any remaining section
+            if current_section:
+                if current_key:
+                    self._add_lot_detail_section_to_word(doc, current_key, current_section)
+                elif "Güncelleme Tarihi:" in current_section[0]:
+                    self._add_update_timestamp_to_word(doc, current_section)
             
             # Add page break at end
             doc.add_paragraph().runs[0].add_break(docx.enum.text.WD_BREAK.PAGE)
             
             logger.info("Added lot details to Word document")
             return True
+        
         except Exception as e:
             logger.error(f"Error adding lot details to Word: {str(e)}")
             return False
+
+    def _add_project_info_to_word(self, doc, section_lines):
+        """
+        Add project info section to Word document
         
+        Args:
+            doc: The Word document object
+            section_lines: List of project info lines
+        """
+        # Add title
+        p = doc.add_paragraph()
+        p.add_run("PROJE BİLGİLERİ").bold = True
+        p.style = 'Heading 2'
+        p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Create a table for project info
+        table = doc.add_table(rows=0, cols=2)
+        table.style = 'Table Grid'
+        table.autofit = True
+        
+        # Add project info rows
+        for line in section_lines:
+            if ":" in line and not line.startswith("LOT DETAYLARI"):
+                key, value = line.split(":", 1)
+                row = table.add_row().cells
+                row[0].text = key.strip()
+                row[0].paragraphs[0].runs[0].bold = True
+                row[1].text = value.strip()
+        
+        # Add space after table
+        doc.add_paragraph()    
+
+    def _add_update_timestamp_to_word(self, doc, section_lines):
+        """
+        Add update timestamp to Word document
+        
+        Args:
+            doc: The Word document object
+            section_lines: List containing the timestamp line
+        """
+        if section_lines and "Güncelleme Tarihi:" in section_lines[0]:
+            p = doc.add_paragraph()
+            run = p.add_run(section_lines[0].strip())
+            run.bold = True
+            run.italic = True
+            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Add a light horizontal line
+            border = p.paragraph_format.border
+            border.bottom.style = docx.enum.text.WD_BORDER_STYLE.SINGLE
+            border.bottom.width = docx.shared.Pt(0.5)
+            
+            # Add space after timestamp
+            doc.add_paragraph()
+
+    def _add_lot_detail_section_to_word(self, doc, key, section_lines):
+        """
+        Add a lot detail section to Word document in a tabular format
+        
+        Args:
+            doc: The Word document object
+            key: The lot detail key
+            section_lines: List of section content lines
+        """
+        # Add key as heading
+        p = doc.add_paragraph()
+        run = p.add_run(key)
+        run.bold = True
+        run.font.size = docx.shared.Pt(14)
+        p.style = 'Heading 3'
+        
+        # Create a table for this lot detail
+        table = doc.add_table(rows=0, cols=4)
+        table.style = 'Table Grid'
+        
+        # First row for ACTUAL and quantity
+        actual_value = ""
+        quantity = ""
+        
+        # Find the ACTUAL and quantity values
+        for line in section_lines:
+            if "ACTUAL Değeri:" in line and "Parça Miktarı:" in line:
+                parts = line.split("Parça Miktarı:")
+                actual_part = parts[0].strip()
+                quantity_part = "Parça Miktarı:" + parts[1].strip()
+                
+                actual_value = actual_part.replace("ACTUAL Değeri:", "").strip()
+                quantity = quantity_part.replace("Parça Miktarı:", "").strip()
+                break
+        
+        # Add ACTUAL and quantity row
+        row = table.add_row().cells
+        row[0].text = "ACTUAL Değeri:"
+        row[0].paragraphs[0].runs[0].bold = True
+        row[1].text = actual_value
+        row[2].text = "Parça Miktarı:"
+        row[2].paragraphs[0].runs[0].bold = True
+        row[3].text = quantity
+        
+        # Process part numbers if present
+        in_part_numbers = False
+        part_numbers = []
+        
+        for line in section_lines:
+            if line.strip() == "Parça Numaraları:":
+                in_part_numbers = True
+                continue
+            
+            if in_part_numbers and line.strip() and "-" in line:
+                part_numbers.append(line.strip())
+        
+        # Add part numbers in a two-column layout
+        if part_numbers:
+            # Add a Part Numbers row header
+            row = table.add_row().cells
+            row[0].merge(row[3])
+            row[0].text = "Parça Numaraları:"
+            row[0].paragraphs[0].runs[0].bold = True
+            row[0].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Add part numbers in pairs
+            for i in range(0, len(part_numbers), 2):
+                row = table.add_row().cells
+                row[0].merge(row[1])
+                row[0].text = part_numbers[i]
+                
+                if i + 1 < len(part_numbers):
+                    row[2].merge(row[3])
+                    row[2].text = part_numbers[i + 1]
+        
+        # Find notes if present
+        in_notes = False
+        notes_content = []
+        
+        for line in section_lines:
+            if line.strip() == "Notlar:":
+                in_notes = True
+                continue
+            
+            if in_notes and line.strip() and not line.startswith("-"):
+                notes_content.append(line.strip())
+        
+        # Add notes if present
+        if notes_content:
+            row = table.add_row().cells
+            row[0].merge(row[3])
+            row[0].text = "Notlar:"
+            row[0].paragraphs[0].runs[0].bold = True
+            row[0].paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            
+            row = table.add_row().cells
+            row[0].merge(row[3])
+            row[0].text = "\n".join(notes_content)
+        
+        # Add space after the table
+        doc.add_paragraph()
+
+
 class ProjectManager:
     """
     Manages project structure, folders, and files
