@@ -1,0 +1,42 @@
+from docx import Document
+import zipfile
+from io import BytesIO
+
+def read_docx_safely(file_path):
+    try:
+        # Normal yöntemle açmayı dene
+        doc = Document(file_path)
+        return doc
+    except Exception as e:
+        if "word/header3.xml" in str(e):
+            # Dosyayı ZIP olarak açıp onarma işlemi
+            try:
+                # Dosyayı zip olarak aç
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    # Tüm içeriği bellekte bir BytesIO nesnesine kopyala
+                    buffer = BytesIO()
+                    with zipfile.ZipFile(buffer, 'w') as fixed_zip:
+                        # Her dosyayı kopyala, ancak sorunlu olanı atla
+                        for item in zip_ref.infolist():
+                            if item.filename != 'word/header3.xml':
+                                fixed_zip.writestr(item, zip_ref.read(item.filename))
+                
+                # BytesIO'dan düzeltilmiş docx'i oku
+                buffer.seek(0)
+                doc = Document(buffer)
+                return doc
+            except Exception as inner_e:
+                print(f"Onarma girişimi başarısız: {inner_e}")
+                raise
+        else:
+            # Başka bir hata ise, yeniden yükselt
+            raise
+
+# Kullanım
+try:
+    doc = read_docx_safely("sorunlu_dosya.docx")
+    # Dosya içeriğini işleme
+    for para in doc.paragraphs:
+        print(para.text)
+except Exception as e:
+    print(f"Dosya okuma hatası: {e}")
