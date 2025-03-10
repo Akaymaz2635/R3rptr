@@ -1,0 +1,103 @@
+import os
+import time
+import win32com.client
+from pathlib import Path
+import logging
+
+# Loglama ayarları
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename='word_process_log.txt',
+    filemode='a'
+)
+
+def process_word_files(folder_path):
+    """
+    Belirtilen klasördeki tüm Word dosyalarını açıp kaydeder ve kapatır.
+    Bu işlem word/header3.xml hatası gibi yapısal sorunları çözebilir.
+    
+    Args:
+        folder_path (str): Word dosyalarının bulunduğu klasör yolu
+    """
+    try:
+        # Word uygulamasını başlat
+        word_app = win32com.client.Dispatch("Word.Application")
+        # İşlem sırasında Word'ün görünür olup olmaması
+        word_app.Visible = False
+        # Uyarıları devre dışı bırak
+        word_app.DisplayAlerts = False
+        
+        # Dosya sayacı
+        processed_count = 0
+        error_count = 0
+        
+        # Klasör yolunu Path nesnesine dönüştür
+        folder = Path(folder_path)
+        
+        # Klasörde tüm .docx ve .doc dosyalarını bul
+        word_files = list(folder.glob("**/*.docx")) + list(folder.glob("**/*.doc"))
+        
+        total_files = len(word_files)
+        logging.info(f"Toplam {total_files} Word dosyası bulundu.")
+        print(f"Toplam {total_files} Word dosyası bulundu.")
+        
+        for file_path in word_files:
+            try:
+                full_path = str(file_path.resolve())
+                print(f"İşleniyor: {file_path.name}")
+                logging.info(f"İşleniyor: {full_path}")
+                
+                # Dosyayı aç
+                doc = word_app.Documents.Open(full_path)
+                
+                # Biraz bekle (bazen dosya tam açılmayabilir)
+                time.sleep(1)
+                
+                # Dosyayı kaydet
+                doc.Save()
+                
+                # Dosyayı kapat
+                doc.Close()
+                
+                processed_count += 1
+                logging.info(f"Başarıyla işlendi: {full_path}")
+                print(f"Başarıyla işlendi: {file_path.name}")
+                
+            except Exception as e:
+                error_count += 1
+                error_msg = f"Hata oluştu ({file_path.name}): {str(e)}"
+                logging.error(error_msg)
+                print(error_msg)
+                
+                # Hata durumunda açık kalan dosyayı kapatmaya çalış
+                try:
+                    doc.Close(SaveChanges=False)
+                except:
+                    pass
+        
+        print(f"\nİşlem tamamlandı!")
+        print(f"Başarıyla işlenen dosya sayısı: {processed_count}")
+        print(f"Hata oluşan dosya sayısı: {error_count}")
+        logging.info(f"İşlem tamamlandı! Başarılı: {processed_count}, Hatalı: {error_count}")
+        
+    except Exception as e:
+        logging.error(f"Genel hata: {str(e)}")
+        print(f"Genel hata oluştu: {str(e)}")
+        
+    finally:
+        # Word uygulamasını kapat
+        try:
+            word_app.Quit()
+        except:
+            pass
+
+if __name__ == "__main__":
+    # Kullanıcıdan klasör yolunu al
+    folder_path = input("Word dosyalarının bulunduğu klasör yolunu girin: ")
+    
+    # Klasör var mı kontrol et
+    if os.path.exists(folder_path) and os.path.isdir(folder_path):
+        process_word_files(folder_path)
+    else:
+        print("Geçersiz klasör yolu! Lütfen var olan bir klasör belirtin.")
