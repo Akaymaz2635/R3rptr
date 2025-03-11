@@ -1,0 +1,241 @@
+class ReportGenerator:
+    """
+    Generates reports by updating Word documents with ACTUAL values
+    """
+    def __init__(self, project_manager):
+        self.project_manager = project_manager
+    
+    def create_report(self, source_file, table_index, actual_values, col_indices, lot_detail_manager=None):
+        """
+        Create a report by copying and updating a Word document with ALL tables
+        
+        Args:
+            source_file (str): Source Word document path
+            table_index (int): Index of the currently selected table (used only for logging)
+            actual_values (dict): Dictionary of actual values
+            col_indices (dict): Dictionary of column indices
+            lot_detail_manager (LotDetailManager): Lot detail manager for adding lot details
+            
+        Returns:
+            tuple: (success, file_path, message)
+        """
+        try:
+            # Validate serial folder
+            if not self.project_manager.serial_folder:
+                return False, None, "Project folder not created"
+            
+            # Create new file name
+            file_name = f"{self.project_manager.project_info['Seri No']}_{os.path.basename(source_file)}"
+            output_file = os.path.join(self.project_manager.serial_folder, file_name)
+            
+            # Copy the file
+            shutil.copy2(source_file, output_file)
+            
+            # Open the copied document
+            doc = Document(output_file)
+            
+            # Initialize counters for statistics
+            total_updated_count = 0
+            updated_tables_count = 0
+            
+            # Process ALL tables in the document
+            for current_table_idx, table in enumerate(doc.tables):
+                # Find the header row for current table
+                header_row_idx = self._find_header_row(table)
+                if header_row_idx == -1:
+                    logger.warning(f"Header row not found in table {current_table_idx}, skipping")
+                    continue
+                
+                # Get column indices for current table
+                current_col_indices = self._get_column_indices_for_table(table, header_row_idx)
+                
+                # Skip tables without required columns
+                if current_col_indices['actual'] == -1 or current_col_indices['item_no'] == -1 or current_col_indices['dimension'] == -1:
+                    logger.warning(f"Required columns not found in table {current_table_idx}, skipping")
+                    continue
+                
+                # Update ACTUAL values in the current table
+                updated_count = self._update_actual_values(
+                    table, 
+                    header_row_idx, 
+                    actual_values, 
+                    current_col_indices
+                )
+                
+                if updated_count > 0:
+                    total_updated_count += updated_count
+                    updated_tables_count += 1
+                    logger.info(f"Updated {updated_count} rows in table {current_table_idx}")
+            
+            # Add lot details if available
+            lot_details_file = None
+            lot_details_content = []
+            
+            if lot_detail_manager and hasattr(lot_detail_manager, 'part_quantities'):
+                # Export lot details to text (this now appends rather than overwrites)
+                lot_details_file, new_lot_details_content = lot_detail_manager.export_lot_details_to_text(
+                    self.project_manager.serial_folder,
+                    self.project_manager.project_info
+                )
+                
+                # If export was successful, read the entire file to get all lot details
+                if lot_details_file:
+                    try:
+                        with open(lot_details_file, "r", encoding="utf-8") as f:
+                            lot_details_content = f.read().splitlines()
+                        
+                        # Add lot details to Word document
+                        if lot_details_content:
+                            lot_detail_manager.add_lot_details_to_word(doc, lot_details_content)
+                    except Exception as e:
+                        logger.error(f"Error reading lot details for Word document: {str(e)}")
+            
+            # Save the document
+            doc.save(output_file)
+            
+            # Create success message
+            message = f"Rapor kaydedildi: {output_file}\n" + \
+                     f"Güncellenen toplam satır: {total_updated_count}\n" + \
+                     f"Güncellenen tablo sayısı: {updated_tables_count}"
+            
+            if lot_details_file:
+                message += f"\nLot detayları: {lot_details_file}"
+            
+            logger.info(f"Report created: {output_file}")
+            return True, output_file, message
+            
+        except Exception as e:
+            logger.error(f"Error creating report: {str(e)}")
+            return False, None, f"Error: {str(e)}"
+    
+    def _find_header_row(self, table):
+        """
+        Find the header row in the table
+        
+        Args:
+            table: Word table object
+            
+        Returns:
+            int: Header row index or -1 if not found
+        """
+        for i, row in enumerate(table.rows):
+            # Get text from all cells
+            row_text = " ".join([cell.text.strip().upper() for cell in row.cells])
+            
+            # Skip RECORDING SHEET rows
+            if any(pattern in row_text for pattern in ["RECORDIG SHEET", "RECORDING SHEET", "REC ORDIG SHEET"]):
+                continue
+            
+            # Look for header indicators
+            if ("ITEM" in row_text and "NO" in row_text) and "DIMENSION" in row_text and "ACTUAL" in row_text:
+                return i
+        
+        # If not found, check first few rows for ACTUAL
+        for i in range(min(3, len(table.rows))):
+            header_cells = [cell.text.strip().upper() for cell in table.rows[i].cells]
+            if any("ACTUAL" in cell for cell in header_cells):
+                return i
+        
+        return -1
+    
+    def _get_column_indices_for_table(self, table, header_row_idx):
+        """
+        Find important column indices in the table header row
+        
+        Args:
+            table: Word table object
+            header_row_idx: Index of the header row
+            
+        Returns:
+            dict: Dictionary of column indices
+        """
+        indices = {
+            'actual': -1,
+            'item_no': -1,
+            'dimension': -1,
+            'badge': -1,
+            'tooling': -1,
+            'insp_level': -1
+        }
+        
+        # Check if header row exists
+        if header_row_idx >= 0 and header_row_idx < len(table.rows):
+            header_row = table.rows[header_row_idx]
+            
+            # Find indices in current table's header
+            for idx, cell in enumerate(header_row.cells):
+                header_upper = cell.text.strip().upper()
+                
+                if "ACTUAL" in header_upper:
+                    indices['actual'] = idx
+                if "ITEM NO" in header_upper or "ITEMNO" in header_upper:
+                    indices['item_no'] = idx
+                if "DIMENSION" in header_upper or "DIM" in header_upper:
+                    indices['dimension'] = idx
+                if "BADGE" in header_upper:
+                    indices['badge'] = idx
+                if "TOOLING" in header_upper:
+                    indices['tooling'] = idx
+                if "INSP. LEVEL" in header_upper or "INSPLEVEL" in header_upper:
+                    indices['insp_level'] = idx
+        
+        return indices
+    
+    def _update_actual_values(self, table, header_row_idx, actual_values, col_indices):
+        """
+        Update ACTUAL values in the table
+        
+        Args:
+            table: Word table object
+            header_row_idx (int): Header row index
+            actual_values (dict): Dictionary of actual values
+            col_indices (dict): Dictionary of column indices
+            
+        Returns:
+            int: Number of updated rows
+        """
+        updated_count = 0
+        
+        # Get column indices from indices dict
+        actual_col_idx = col_indices['actual']
+        item_no_col_idx = col_indices['item_no']
+        dimension_col_idx = col_indices['dimension']
+        
+        # Make sure we have the required columns
+        if actual_col_idx == -1 or item_no_col_idx == -1 or dimension_col_idx == -1:
+            logger.error("Required columns not found")
+            return 0
+        
+        # Update values
+        for i, row in enumerate(table.rows):
+            # Skip header row and anything before it
+            if i <= header_row_idx:
+                continue
+            
+            # Check column indices are within range
+            if (item_no_col_idx >= len(row.cells) or 
+                dimension_col_idx >= len(row.cells) or 
+                actual_col_idx >= len(row.cells)):
+                continue
+            
+            # Get cell values
+            item_no = row.cells[item_no_col_idx].text.strip()
+            dimension = row.cells[dimension_col_idx].text.strip()
+            
+            # Skip if item_no or dimension is empty
+            if not item_no or not dimension:
+                continue
+            
+            # Create key
+            key = f"{dimension}_{item_no}"
+            
+            # Check if we have a value for this key
+            if key in actual_values and actual_values[key]:
+                actual_value = str(actual_values[key])
+                
+                # Update the cell
+                row.cells[actual_col_idx].text = actual_value
+                updated_count += 1
+                logger.debug(f"Updated {key} with {actual_value}")
+        
+        return updated_count
