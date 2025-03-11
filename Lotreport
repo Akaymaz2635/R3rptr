@@ -1,0 +1,287 @@
+def export_lot_details_to_text(self, folder_path, project_info):
+    """
+    Export lot details to a text file using a tabular format.
+    Only exports new or modified details to avoid duplicate entries.
+    
+    Args:
+        folder_path (str): Path to save the file
+        project_info (dict): Project information for the header
+        
+    Returns:
+        str: Path to the created file
+        list: Content lines of the lot details
+    """
+    lot_details_file = os.path.join(folder_path, "lot_details.txt")
+    lot_details_content = []
+    
+    # Check if the file already exists
+    file_exists = os.path.exists(lot_details_file)
+    existing_keys = set()
+    existing_part_quantities = {}
+    existing_part_numbers = {}
+    existing_lot_notes = {}
+    
+    if file_exists:
+        # Read existing file to extract keys and preserve content
+        try:
+            with open(lot_details_file, "r", encoding="utf-8") as f:
+                existing_content = f.read()
+                
+            # Track current key while parsing file
+            current_key = None
+            in_part_numbers = False
+            in_notes = False
+            notes_content = []
+            
+            # Extract existing keys and their data to avoid duplication
+            for line in existing_content.splitlines():
+                line = line.strip()
+                
+                # Skip empty lines
+                if not line:
+                    in_part_numbers = False
+                    in_notes = False
+                    
+                    # Save notes if we were collecting them
+                    if notes_content and current_key:
+                        existing_lot_notes[current_key] = "\n".join(notes_content)
+                        notes_content = []
+                    continue
+                
+                # Skip separators but reset state
+                if line.startswith("=") or line.startswith("-"):
+                    in_part_numbers = False
+                    in_notes = False
+                    
+                    # Save notes if we were collecting them
+                    if notes_content and current_key:
+                        existing_lot_notes[current_key] = "\n".join(notes_content)
+                        notes_content = []
+                    continue
+                
+                # Skip headers and timestamps
+                if line == "LOT DETAYLARI:" or line.startswith("Güncelleme Tarihi:"):
+                    continue
+                    
+                # Skip project info lines
+                if any(line.startswith(prefix) for prefix in [
+                    "Proje Tipi:", "Parça Numarası:", "Operasyon No:", 
+                    "Seri No:", "Oluşturma Tarihi:", "Yarım Kalan Ölçüm:"
+                ]):
+                    continue
+                
+                # Check if this is a key line (e.g., "● 6.3 RA_KN998 ●")
+                if "_" in line and "●" in line:
+                    # Save notes if we were collecting them for a previous key
+                    if notes_content and current_key:
+                        existing_lot_notes[current_key] = "\n".join(notes_content)
+                        notes_content = []
+                    
+                    # Extract the key
+                    current_key = line.strip().replace("●", "").strip()
+                    existing_keys.add(current_key)
+                    in_part_numbers = False
+                    in_notes = False
+                    continue
+                
+                # Check for key from a different format (just the key text)
+                elif "_" in line and not line.startswith(" ") and ":" not in line:
+                    # Save notes if we were collecting them for a previous key
+                    if notes_content and current_key:
+                        existing_lot_notes[current_key] = "\n".join(notes_content)
+                        notes_content = []
+                    
+                    # Set new current key
+                    current_key = line
+                    existing_keys.add(current_key)
+                    in_part_numbers = False
+                    in_notes = False
+                    continue
+                
+                # Skip if we don't have a current key
+                if not current_key:
+                    continue
+                
+                # Check for part quantity
+                if line.startswith("Parça Miktarı:") or "Parça Miktarı:" in line:
+                    quantity = line.split("Parça Miktarı:")[-1].strip()
+                    existing_part_quantities[current_key] = quantity
+                    continue
+                
+                # Check for part numbers section
+                if line == "Parça Numaraları:":
+                    in_part_numbers = True
+                    in_notes = False
+                    
+                    # Initialize part numbers dictionary if needed
+                    if current_key not in existing_part_numbers:
+                        existing_part_numbers[current_key] = {}
+                    continue
+                
+                # Parse part numbers
+                if in_part_numbers:
+                    parts = line.split("-", 1)
+                    if len(parts) == 2 and parts[0].strip().isdigit():
+                        part_idx = parts[0].strip()
+                        part_num = parts[1].strip()
+                        if current_key not in existing_part_numbers:
+                            existing_part_numbers[current_key] = {}
+                        existing_part_numbers[current_key][part_idx] = part_num
+                    continue
+                
+                # Check for notes section
+                if line == "Notlar:":
+                    in_part_numbers = False
+                    in_notes = True
+                    notes_content = []  # Reset notes for this key
+                    continue
+                
+                # Collect notes content
+                if in_notes:
+                    notes_content.append(line)
+            
+            # Save any remaining notes
+            if notes_content and current_key:
+                existing_lot_notes[current_key] = "\n".join(notes_content)
+                
+            logger.info(f"Found {len(existing_keys)} existing keys in lot_details.txt")
+            
+        except Exception as e:
+            logger.error(f"Error reading existing lot details: {str(e)}")
+            file_exists = False
+    
+    # If file doesn't exist, include project info header
+    if not file_exists:
+        # Add project info header
+        lot_details_content.append("=" * 80)
+        lot_details_content.append("PROJE BİLGİLERİ".center(80))
+        lot_details_content.append("=" * 80)
+        lot_details_content.append("")
+        
+        # Format project info in a tabular way
+        for key, value in project_info.items():
+            lot_details_content.append(f"{key:20}: {value}")
+        
+        lot_details_content.append("")
+        lot_details_content.append("=" * 80)
+        lot_details_content.append("LOT DETAYLARI".center(80))
+        lot_details_content.append("=" * 80)
+        lot_details_content.append("")
+    else:
+        # For appending, just add a separator
+        lot_details_content.append("=" * 80)
+        
+        # Add current timestamp to show when this update happened
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        lot_details_content.append(f"Güncelleme Tarihi: {timestamp}".center(80))
+        lot_details_content.append("=" * 80)
+        lot_details_content.append("")
+    
+    # Compare current data with existing data to find what's new or modified
+    has_new_details = False
+    keys_to_process = []
+    
+    for key in self.part_quantities.keys():
+        # Get current values
+        current_quantity = self.part_quantities.get(key, "0")
+        current_part_numbers = self.part_numbers.get(key, {})
+        current_notes = self.lot_notes.get(key, "")
+        
+        # Check if this key exists in the file and if its data has changed
+        is_modified = False
+        
+        # If key is new, it's definitely modified
+        if key not in existing_keys:
+            is_modified = True
+        else:
+            # Check if quantity changed
+            if key in existing_part_quantities and existing_part_quantities[key] != current_quantity:
+                is_modified = True
+            
+            # Check if part numbers changed
+            if key in existing_part_numbers:
+                existing_parts = existing_part_numbers[key]
+                # Different number of parts?
+                if len(existing_parts) != len(current_part_numbers):
+                    is_modified = True
+                else:
+                    # Check each part number
+                    for part_idx, part_num in current_part_numbers.items():
+                        if part_idx not in existing_parts or existing_parts[part_idx] != part_num:
+                            is_modified = True
+                            break
+            
+            # Check if notes changed
+            if key in existing_lot_notes and existing_lot_notes[key] != current_notes:
+                is_modified = True
+        
+        # Add to process list if it's new or modified
+        if is_modified:
+            keys_to_process.append(key)
+    
+    # Process each key and format in a more compact way
+    for key in keys_to_process:
+        has_new_details = True
+        actual_value = self.parent.actual_values.get(key, "")
+        quantity = self.part_quantities.get(key, "0")
+        part_numbers = self.part_numbers.get(key, {})
+        notes = self.lot_notes.get(key, "")
+        
+        # Add key as header
+        lot_details_content.append(f"● {key} ●".center(80))
+        lot_details_content.append("-" * 80)
+        
+        # Create a two-column layout
+        lot_details_content.append(f"{'ACTUAL Değeri:':<20} {actual_value:<30}{'Parça Miktarı:':<15} {quantity}")
+        
+        # Prepare part numbers in a more organized way
+        if part_numbers:
+            lot_details_content.append("")
+            lot_details_content.append("Parça Numaraları:".center(80))
+            
+            # Display part numbers in a more table-like format
+            rows = []
+            for i in range(1, int(quantity) + 1, 2):
+                if str(i) in part_numbers and i+1 <= int(quantity) and str(i+1) in part_numbers:
+                    rows.append(f"{i:2}- {part_numbers[str(i)]:<35} {i+1:2}- {part_numbers[str(i+1)]}")
+                elif str(i) in part_numbers:
+                    rows.append(f"{i:2}- {part_numbers[str(i)]}")
+            
+            for row in rows:
+                lot_details_content.append(row)
+        
+        # Add notes if present
+        if notes:
+            lot_details_content.append("")
+            lot_details_content.append("Notlar:".center(80))
+            # Wrap notes at 78 characters for better presentation
+            for i in range(0, len(notes), 78):
+                lot_details_content.append(notes[i:i+78])
+        
+        lot_details_content.append("")
+        lot_details_content.append("-" * 80)
+        lot_details_content.append("")
+    
+    # Write to file if we have new details or if file doesn't exist
+    if has_new_details or not file_exists:
+        try:
+            if file_exists:
+                # Append mode
+                with open(lot_details_file, "a", encoding="utf-8") as f:
+                    for line in lot_details_content:
+                        f.write(f"{line}\n")
+                logger.info(f"Appended new lot details to: {lot_details_file}")
+            else:
+                # Create new file
+                with open(lot_details_file, "w", encoding="utf-8") as f:
+                    for line in lot_details_content:
+                        f.write(f"{line}\n")
+                logger.info(f"Created new lot details file: {lot_details_file}")
+            
+            return lot_details_file, lot_details_content
+        except Exception as e:
+            logger.error(f"Error saving lot details: {str(e)}")
+            return None, lot_details_content
+    else:
+        logger.info(f"No new lot details to add. File remains unchanged.")
+        return lot_details_file, []  # Return empty content list since we're not adding anything
