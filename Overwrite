@@ -1,0 +1,99 @@
+def export_lot_details_to_text(self, folder_path, project_info):
+    """
+    Export lot details to a text file using a tabular format.
+    Overwrites any existing file with current data only.
+    
+    Args:
+        folder_path (str): Path to save the file
+        project_info (dict): Project information for the header
+        
+    Returns:
+        str: Path to the created file
+        list: Content lines of the lot details
+    """
+    lot_details_file = os.path.join(folder_path, "lot_details.txt")
+    lot_details_content = []
+    
+    # Always create header with project info regardless of file existence
+    lot_details_content.append("=" * 80)
+    lot_details_content.append("PROJE BİLGİLERİ".center(80))
+    lot_details_content.append("=" * 80)
+    lot_details_content.append("")
+    
+    # Format project info in a tabular way
+    for key, value in project_info.items():
+        lot_details_content.append(f"{key:20}: {value}")
+    
+    lot_details_content.append("")
+    lot_details_content.append("=" * 80)
+    lot_details_content.append("LOT DETAYLARI".center(80))
+    lot_details_content.append("=" * 80)
+    lot_details_content.append("")
+    
+    # Add current timestamp
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    lot_details_content.append(f"Oluşturma Tarihi: {timestamp}".center(80))
+    lot_details_content.append("=" * 80)
+    lot_details_content.append("")
+    
+    # Process each key and format in a compact way
+    has_details = False
+    
+    for key in self.part_quantities.keys():
+        has_details = True
+        actual_value = self.parent.actual_values.get(key, "")
+        quantity = self.part_quantities.get(key, "0")
+        part_numbers = self.part_numbers.get(key, {})
+        notes = self.lot_notes.get(key, "")
+        
+        # Add key as header
+        lot_details_content.append(f"● {key} ●".center(80))
+        lot_details_content.append("-" * 80)
+        
+        # Create a two-column layout
+        lot_details_content.append(f"{'ACTUAL Değeri:':<20} {actual_value:<30}{'Parça Miktarı:':<15} {quantity}")
+        
+        # Prepare part numbers in a more organized way
+        if part_numbers:
+            lot_details_content.append("")
+            lot_details_content.append("Parça Numaraları:".center(80))
+            
+            # Display part numbers in a more table-like format
+            rows = []
+            for i in range(1, int(quantity) + 1, 2):
+                if str(i) in part_numbers and i+1 <= int(quantity) and str(i+1) in part_numbers:
+                    rows.append(f"{i:2}- {part_numbers[str(i)]:<35} {i+1:2}- {part_numbers[str(i+1)]}")
+                elif str(i) in part_numbers:
+                    rows.append(f"{i:2}- {part_numbers[str(i)]}")
+            
+            for row in rows:
+                lot_details_content.append(row)
+        
+        # Add notes if present
+        if notes:
+            lot_details_content.append("")
+            lot_details_content.append("Notlar:".center(80))
+            # Wrap notes at 78 characters for better presentation
+            for i in range(0, len(notes), 78):
+                lot_details_content.append(notes[i:i+78])
+        
+        lot_details_content.append("")
+        lot_details_content.append("-" * 80)
+        lot_details_content.append("")
+    
+    # Write to file (always overwrite)
+    try:
+        # Create new file (overwrite mode)
+        with open(lot_details_file, "w", encoding="utf-8") as f:
+            for line in lot_details_content:
+                f.write(f"{line}\n")
+        
+        if has_details:
+            logger.info(f"Created new lot details file with {len(self.part_quantities)} entries: {lot_details_file}")
+        else:
+            logger.info(f"Created new empty lot details file: {lot_details_file}")
+        
+        return lot_details_file, lot_details_content
+    except Exception as e:
+        logger.error(f"Error saving lot details: {str(e)}")
+        return None, lot_details_content
