@@ -1,0 +1,187 @@
+1 Yıllık Python Programlama Yol Haritası
+Bu yol haritası, temel Python bilginizden profesyonel seviyeye ilerlemenizi sağlayacak haftalık hedefleri içermektedir. Kurslar, kitaplar, mini projeler ve pratik uygulamalarla adım adım ilerleyeceksiniz.
+Ay 1-2: Temel Python Becerilerini Pekiştirme
+Hafta 1: Python Temelleri Tekrarı
+
+Kaynak: "Python Crash Course" kitabının 1-5 bölümleri veya Coursera "Python for Everybody" Kurs 1
+Mini Proje: Basit bir hesap makinesi CLI uygulaması
+Hedef: Veri tipleri, koşullar, fonksiyonlar ve döngüleri tekrar etmek
+
+Hafta 2: Veri Yapıları
+
+Kaynak: "Python Crash Course" 6-10 bölümleri
+Mini Proje: Telefon rehberi uygulaması (sözlükler kullanarak)
+Hedef: Listeleri, sözlükleri, kümeleri ve bunların metotlarını öğrenmek
+
+Hafta 3: Dosya İşlemleri
+
+Kaynak: Automate the Boring Stuff with Python (Bölüm 8-9)
+Mini Proje: Basit bir günlük tutma uygulaması (dosyaya yazma/okuma)
+Hedef: Dosya okuma/yazma, CSV işleme
+
+Hafta 4: Hata Yönetimi
+
+Kaynak: Real Python "Python Exceptions" makalesi
+Mini Proje: Önceki projelere try/except blokları eklemek
+Hedef: Hata yakalama ve yönetme, özel hata sınıfları oluşturma
+
+Hafta 5-6: Nesne Yönelimli Programlama
+
+Kaynak: "Python Object-Oriented Programming" kursları (Coursera veya Udemy)
+Mini Proje: Basit bir banka hesap sistemi
+Hedef: Sınıflar, nesneler, kalıtım, kapsülleme, çok biçimlilik
+
+Hafta 7-8: Modüler Programlama
+
+Kaynak: "Clean Code in Python" kitabı (ilk bölümler)
+Mini Proje: Önceki projelerinizi modüllere ayırmak
+Hedef: Modüller, paketler, import ifadeleri, pip kullanımı
+
+Ay 3-4: Arayüz Geliştirme ve Veritabanı
+Hafta 9-10: Tkinter İle GUI Temelleri
+
+Kaynak: "Tkinter GUI Application Development Blueprints" kitabı veya "Python GUI Programming with Tkinter" kursu
+Mini Proje: Basit not defteri uygulaması
+Hedef: Form elemanları, layout, event handling
+
+Hafta 11-12: İleri Tkinter / CustomTkinter
+
+Kaynak: CustomTkinter dokümantasyonu, GitHub örnekleri
+Mini Proje: Görev takip uygulaması
+Hedef: Özelleştirme, scrollable frames, dialog pencereleri
+
+Hafta 13-14: SQLite ve Veritabanı Temelleri
+
+Kaynak: "SQLite Database for Python" kursu veya "Python with SQLite" dokümanları
+Mini Proje: Veritabanlı adres defteri
+Hedef: Veritabanı bağlantısı, SQL sorguları, CRUD işlemleri
+
+Hafta 15-16: SQLAlchemy ile ORM
+
+Kaynak: SQLAlchemy dokümantasyonu, "Essential SQLAlchemy" kitabı
+Mini Proje: Öğrenci bilgi sistemi
+Hedef: ORM kavramı, veritabanı sınıfları, ilişkiler
+
+Ay 5-6: Mimari Yaklaşımlar ve İleri GUI
+Hafta 17-18: Mimari Desenler 1 - MVC
+
+Kaynak: ArjanCodes YouTube kanalı "MVC in Python" videoları
+Mini Proje: MVC kalıbıyla todo uygulaması
+Hedef: MVC mimarisi, sorumluluk ayrımı, maintainable kod
+
+Hafta 19-20: Mimari Desenler 2 - MVVM
+
+Kaynak: "GUI Applications with Python & PyQt" kursu
+Mini Proje: MVVM kalıbıyla aynı todo uygulaması
+Hedef: MVVM mimarisi, data binding, command pattern
+
+Hafta 21-22: PyQt5 Temelleri
+
+Kaynak: "PyQt5 Tutorial" - RealPython veya "Create GUI Applications with Python & Qt" kitabı
+Mini Proje: Hesap makinesi uygulaması (PyQt5 ile)
+Hedef: PyQt5 temel widget'ları, signals & slots
+
+Hafta 23-24: PyQt5 İleri Seviye
+
+Kaynak: "Advanced PyQt5" kursu
+Mini Proje: Dosya yöneticisi uygulaması
+Hedef: Model/View mimarisi, custom widgets, styles
+
+Ay 7-8: Belge İşleme ve Raporlama
+Hafta 25-26: Excel Dosyaları ile Çalışma
+
+Kaynak: "Working with Excel Files in Python" - RealPython
+Mini Proje: Excel veri analiz uygulaması
+Hedef: openpyxl, pandas, excel manipülasyonu
+
+Hafta 27-28: Word Belgeleri ile Çalışma
+
+Kaynak: python-docx dokümantasyonu
+Mini Proje: Otomatik rapor üreten uygulama
+Hedef: Belge oluşturma, şablonlar, metin formatlama
+
+Hafta 29-30: PDF İşlemleri
+
+Kaynak: ReportLab dokümantasyonu
+Mini Proje: PDF fatura oluşturucu
+Hedef: PDF oluşturma, tablolar, grafikler
+
+Hafta 31-32: Çoklu Format Desteği
+
+Kaynak: Jinja2 template engine dokümantasyonu
+Mini Proje: Çoklu format rapor üreteci (PDF, DOCX, HTML)
+Hedef: Template engine kullanımı, format dönüşümleri
+
+Ay 9-10: Test, Hata Ayıklama ve Güvenlik
+Hafta 33-34: Birim Testleri
+
+Kaynak: "Python Testing with pytest" kitabı
+Mini Proje: Önceki projelerinize test eklemek
+Hedef: Pytest framework, test yazma, assertions
+
+Hafta 35-36: Mock ve Test Coverage
+
+Kaynak: unittest.mock dokümantasyonu
+Mini Proje: Bağımlılıkları mocklayarak test yazmak
+Hedef: Mock objects, test coverage, parametrize tests
+
+Hafta 37-38: Logging ve Hata Ayıklama
+
+Kaynak: Python logging modülü dokümantasyonu
+Mini Proje: Kapsamlı log sistemi ekleme
+Hedef: Log levels, handlers, formatters
+
+Hafta 39-40: Güvenlik Temelleri
+
+Kaynak: OWASP Python güvenlik pratikleri
+Mini Proje: Güvenlik denetimi ve iyileştirme
+Hedef: Input validation, veri sanitizasyonu, şifreleme
+
+Ay 11-12: İleri Konular ve Kendi Projeniz
+Hafta 41-42: Eşzamanlı Programlama
+
+Kaynak: "Python Concurrency" kursu
+Mini Proje: Çoklu indirme yöneticisi
+Hedef: Threading, multiprocessing, asyncio
+
+Hafta 43-44: Type Hints ve Modern Python
+
+Kaynak: "Python Type Checking" - RealPython
+Mini Proje: Kodunuza type hints ekleme
+Hedef: Type annotations, mypy, static typing
+
+Hafta 45-46: Çoklu Dil Desteği
+
+Kaynak: gettext dokümantasyonu
+Mini Proje: Uygulamanıza dil desteği ekleme
+Hedef: Internationalization, localization
+
+Hafta 47-52: Kendi Projenizin Geliştirilmesi
+
+Kaynak: Önceki öğrenimleriniz ve ek kaynaklar
+Ana Proje: Ölçüm Rapor Sistemi'nin geliştirilmiş versiyonu
+Hedef: Tüm öğrendiklerinizi uygulayarak projenizi tamamlamak
+
+Önemli Kitaplar:
+
+"Python Crash Course" - Eric Matthes
+"Fluent Python" - Luciano Ramalho
+"Clean Code in Python" - Mariano Anaya
+"Architecture Patterns with Python" - Harry Percival & Bob Gregory
+"Python Testing with pytest" - Brian Okken
+
+Önerilen Çevrimiçi Kaynaklar:
+
+Real Python (realpython.com)
+ArjanCodes YouTube Kanalı
+Python Discord Topluluğu
+"PyQt5 For Beginners" - Tech With Tim YouTube Serisi
+"Corey Schafer" YouTube Kanalı
+
+Ek İpuçları:
+
+Her hafta bir GitHub commit yapın
+Haftalık kod incelemesi için Python toplulukları bulun
+Stack Overflow'da soru sormaktan çekinmeyin
+Düzenli olarak önceki projeleri refactor edin
+Başkalarının kodlarını okuyarak mimari anlayış geliştirin
