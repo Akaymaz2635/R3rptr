@@ -1,0 +1,71 @@
+def save_checkbox_states(self, folder_path, checkbox_states, nonconforming_items):
+    """
+    Checkbox durumlarını ve uygunsuz öğeleri bir JSON dosyasına kaydet
+    
+    Args:
+        folder_path (str): Kayıt klasörü yolu
+        checkbox_states (dict): Checkbox durumlarını içeren sözlük
+        nonconforming_items (dict): Uygunsuz öğeleri içeren sözlük
+        
+    Returns:
+        bool: Başarılıysa True, değilse False
+    """
+    try:
+        import json
+        
+        checkbox_file = os.path.join(folder_path, "checkbox_states.json")
+        
+        # Kaydedilecek veriyi hazırla
+        data = {
+            "checkbox_states": checkbox_states,
+            "nonconforming_items": nonconforming_items
+        }
+        
+        # JSON dosyasına yaz
+        with open(checkbox_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+            
+        logger.info(f"Checkbox durumları kaydedildi: {checkbox_file}")
+        return True
+    except Exception as e:
+        logger.error(f"Checkbox durumlarını kaydetme hatası: {str(e)}")
+        return False
+
+def load_checkbox_states(self, folder_path):
+    """
+    Checkbox durumlarını ve uygunsuz öğeleri bir JSON dosyasından yükle
+    
+    Args:
+        folder_path (str): Kayıt klasörü yolu
+        
+    Returns:
+        tuple: (checkbox_states, nonconforming_items) veya hata durumunda (None, None)
+    """
+    try:
+        import json
+        
+        checkbox_file = os.path.join(folder_path, "checkbox_states.json")
+        
+        # Dosya mevcut değilse boş sözlükler döndür
+        if not os.path.exists(checkbox_file):
+            logger.info(f"Checkbox durumları dosyası bulunamadı: {checkbox_file}")
+            return {}, {}
+            
+        # JSON dosyasını oku
+        with open(checkbox_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        # Verileri çıkart
+        checkbox_states = data.get("checkbox_states", {})
+        nonconforming_items = data.get("nonconforming_items", {})
+        
+        # String anahtarları (keys) düzeltme
+        # JSON, sayısal anahtarları string'e çevirir, onları tekrar int'e çevirmeliyiz
+        # checkbox_states = {str(k): v for k, v in checkbox_states.items()}
+        # nonconforming_items = {str(k): v for k, v in nonconforming_items.items()}
+        
+        logger.info(f"Checkbox durumları yüklendi: {len(checkbox_states)} öğe")
+        return checkbox_states, nonconforming_items
+    except Exception as e:
+        logger.error(f"Checkbox durumlarını yükleme hatası: {str(e)}")
+        return {}, {}
