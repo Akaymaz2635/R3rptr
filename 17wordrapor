@@ -1,0 +1,162 @@
+def create_report(self, source_file, table_index, actual_values, col_indices, lot_detail_manager=None):
+    """
+    Create a report by updating a Word document with ALL tables.
+    If file already exists in output folder, overwrite it instead of creating a copy.
+    
+    Args:
+        source_file (str): Source Word document path
+        table_index (int): Index of the currently selected table (used only for logging)
+        actual_values (dict): Dictionary of actual values
+        col_indices (dict): Dictionary of column indices
+        lot_detail_manager (LotDetailManager): Lot detail manager for adding lot details
+        
+    Returns:
+        tuple: (success, file_path, message)
+    """
+    try:
+        # Validate serial folder
+        if not self.project_manager.serial_folder:
+            return False, None, "Project folder not created"
+        
+        # Find the serial number with case-insensitive matching to prevent key errors
+        serial_number = None
+        for key in self.project_manager.project_info:
+            if key.upper() in ('SERI NO', 'SERIAL NO', 'SERINO'):
+                serial_number = self.project_manager.project_info[key]
+                break
+        
+        # If serial number is not found, use a default value
+        if not serial_number:
+            serial_number = "Report"
+            logger.warning("Serial number not found in project info, using default")
+        
+        # Check if we're continuing a measurement (look for existing report file)
+        continue_measurement = self.project_manager.project_info.get('CONTINUE_MEASUREMENT', False)
+        
+        # Get the base file name without path
+        source_base_name = os.path.basename(source_file)
+        
+        # First look for a file with the exact same name as the source in the serial folder
+        output_file = os.path.join(self.project_manager.serial_folder, source_base_name)
+        
+        # If not found, then look for a file with serial_number_ prefix
+        if not os.path.exists(output_file):
+            prefix_file_name = f"{serial_number}_{source_base_name}"
+            prefix_output_file = os.path.join(self.project_manager.serial_folder, prefix_file_name)
+            
+            if os.path.exists(prefix_output_file):
+                output_file = prefix_output_file
+            else:
+                # If no existing file is found, create a new one with serial_number_ prefix
+                output_file = prefix_output_file
+        
+        # Check if the output file already exists
+        if os.path.exists(output_file):
+            # If file exists, use it directly instead of copying
+            logger.info(f"Output file already exists, overwriting: {output_file}")
+            doc = Document(output_file)
+        else:
+            # If file doesn't exist, copy the source file
+            logger.info(f"Creating new output file: {output_file}")
+            shutil.copy2(source_file, output_file)
+            doc = Document(output_file)
+        
+        # Initialize counters for statistics
+        total_updated_count = 0
+        updated_tables_count = 0
+        
+        # Process ALL tables in the document
+        for current_table_idx, table in enumerate(doc.tables):
+            # Find the header row for current table
+            header_row_idx = self._find_header_row(table)
+            if header_row_idx == -1:
+                logger.warning(f"Header row not found in table {current_table_idx}, skipping")
+                continue
+            
+            # Get column indices for current table
+            current_col_indices = self._get_column_indices_for_table(table, header_row_idx)
+            
+            # Skip tables without required columns
+            if current_col_indices['actual'] == -1 or current_col_indices['item_no'] == -1 or current_col_indices['dimension'] == -1:
+                logger.warning(f"Required columns not found in table {current_table_idx}, skipping")
+                continue
+            
+            # Update ACTUAL values in the current table
+            updated_count = self._update_actual_values(
+                table, 
+                header_row_idx, 
+                actual_values, 
+                current_col_indices
+            )
+            
+            if updated_count > 0:
+                total_updated_count += updated_count
+                updated_tables_count += 1
+                logger.info(f"Updated {updated_count} rows in table {current_table_idx}")
+        
+        # Add lot details if available
+        lot_details_file = None
+        lot_details_content = []
+        lot_details_pdf = None
+        
+        if lot_detail_manager and hasattr(lot_detail_manager, 'part_quantities'):
+            # Export lot details to text 
+            lot_details_file, lot_details_content = lot_detail_manager.export_lot_details_to_text(
+                self.project_manager.serial_folder,
+                self.project_manager.project_info
+            )
+            
+            # Export lot details to PDF
+            lot_details_pdf = lot_detail_manager.export_lot_details_to_pdf(
+                self.project_manager.serial_folder,
+                self.project_manager.project_info,
+                lot_details_content
+            )
+            
+            # If export was successful, read the entire file to get all lot details
+            # if lot_details_file and lot_details_content:
+                # Add lot details to Word document
+                # lot_detail_manager.add_lot_details_to_word(doc, lot_details_content)
+        
+        # Add nonconforming items if available
+        nonconforming_count = self.project_manager.project_info.get('UYGUNSUZ_OLCUM_SAYISI', 0)
+        nonconforming_items = self.project_manager.project_info.get('UYGUNSUZ_OLCUMLER', '')
+        
+        # if nonconforming_items:
+        #     # Add a page for nonconforming items
+        #     doc.add_paragraph().runs[0].add_break(docx.enum.text.WD_BREAK.PAGE)
+            
+        #     heading = doc.add_paragraph()
+        #     heading.add_run("UYGUNSUZ ÖLÇÜMLER").bold = True
+        #     heading.style = 'Heading 1'
+        #     heading.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            
+        #     doc.add_paragraph(f"Toplam uygunsuz ölçüm sayısı: {nonconforming_count}")
+            
+        #     for line in nonconforming_items.splitlines():
+        #         if line.strip():
+        #             doc.add_paragraph(line, style='List Bullet')
+        
+        # Save the document
+        doc.save(output_file)
+        
+        # Create success message
+        message = f"Rapor kaydedildi: {output_file}\n" + \
+                f"Güncellenen toplam satır: {total_updated_count}\n" + \
+                f"Güncellenen tablo sayısı: {updated_tables_count}"
+        
+        if lot_details_file:
+            message += f"\nLot detayları: {lot_details_file}"
+        
+        if lot_details_pdf:
+            message += f"\nLot detayları PDF: {lot_details_pdf}"
+        
+        if nonconforming_count:
+            message += f"\nUygunsuz ölçüm sayısı: {nonconforming_count}"
+        
+        logger.info(f"Report updated/created: {output_file}")
+        return True, output_file, message
+        
+    except Exception as e:
+        logger.error(f"Error creating report: {str(e)}")
+        return False, None, f"Error: {str(e)}"
