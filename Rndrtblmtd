@@ -1,0 +1,198 @@
+def _render_table(self, table):
+    """Render the table with headers and data"""
+    # First render headers
+    header_row = 0
+    # Add a new header for the checkbox column
+    checkbox_header = ctk.CTkLabel(
+        self.table_frame, 
+        text="Seç", 
+        font=("Helvetica", 14, "bold"),
+        width=60, 
+        anchor="center", 
+        corner_radius=6,
+        bg_color="transparent"
+    )
+    checkbox_header.grid(row=header_row, column=0, padx=5, pady=5, sticky="nsew")
+    
+    for j, header in enumerate(self.headers):
+        # Skip BADGE column if present
+        if j == self.col_indices['badge']:
+            continue
+        
+        # Create header label
+        label = ctk.CTkLabel(
+            self.table_frame, 
+            text=header, 
+            font=("Helvetica", 14, "bold"),
+            width=self.col_widths[j] if j < len(self.col_widths) else 120, 
+            anchor="center", 
+            corner_radius=6,
+            bg_color="transparent"
+        )
+        
+        # Adjust grid column if we're skipping BADGE, and add 1 for checkbox column
+        grid_col = j + 1 if j < self.col_indices['badge'] else j
+        if j == len(self.headers) - 1:  # "Lot Check" column
+            grid_col = len(self.headers) - (1 if self.col_indices['badge'] != -1 else 0)
+        
+        label.grid(row=header_row, column=grid_col, padx=5, pady=5, sticky="nsew")
+    
+    # Then render data rows
+    for i, row in enumerate(table[1:], 1):  # Skip header row
+        # Add checkbox at the beginning of each row
+        if (self.col_indices['dimension'] < len(row) and 
+            self.col_indices['item_no'] < len(row)):
+            
+            dimension = row[self.col_indices['dimension']]
+            item_no = row[self.col_indices['item_no']]
+            key = f"{dimension}_{item_no}"
+            
+            # Store row data for reference
+            row_data = {
+                'item_no': item_no,
+                'dimension': dimension,
+                'actual': row[self.col_indices['actual']] if self.col_indices['actual'] < len(row) else "",
+                'bp_zone': row[self.col_indices.get('bp_zone', -1)] if 'bp_zone' in self.col_indices and self.col_indices['bp_zone'] < len(row) else ""
+            }
+            self.row_data[key] = row_data
+            
+            # Create a checkbox variable with saved state if available
+            checkbox_var = tk.IntVar(value=self.checkbox_states.get(key, 0))
+            
+            # Create checkbox
+            checkbox = ctk.CTkCheckBox(
+                self.table_frame,
+                text="",
+                variable=checkbox_var,
+                width=40,
+                height=20,
+                corner_radius=3,
+                command=lambda k=key, v=checkbox_var: self.on_checkbox_toggle(k, v)
+            )
+            checkbox.grid(row=i, column=0, padx=5, pady=5, sticky="nsew")
+            
+            # Store checkbox widget and state
+            self.checkbox_widgets[key] = checkbox
+            self.checkbox_states[key] = checkbox_var.get()
+            
+            # Eğer checkbox işaretliyse ve daha önce kaydedilmiş uygunsuz öğeler varsa
+            # nonconforming_items'a ekle
+            if self.checkbox_states.get(key, 0) == 1 and key not in self.nonconforming_items and key in self.row_data:
+                # Bir uygunsuz öğe mesajı oluştur
+                row = self.row_data[key]
+                item_no = row.get('item_no', '')
+                dimension = row.get('dimension', '')
+                bp_zone = row.get('bp_zone', '')
+                
+                # Actual değerini al
+                actual = ""
+                if key in self.widgets:
+                    actual = self.widgets[key].get()
+                if not actual:
+                    actual = self.actual_values.get(key, '') or row.get('actual', '')
+                
+                # Format: "[ITEM NO] DIMENSION (B/P ZONE) checks ACTUAL."
+                bp_zone_text = f" ({bp_zone})" if bp_zone else ""
+                nonconforming_message = f"[{item_no}] {dimension}{bp_zone_text} checks {actual}."
+                
+                # Mesajı kaydet
+                self.nonconforming_items[key] = nonconforming_message
+        
+        for j, cell in enumerate(row):
+            # Skip BADGE column
+            if j == self.col_indices['badge']:
+                continue
+            
+            # Adjust grid column (add 1 for checkbox column)
+            grid_col = j + 1 if j < self.col_indices['badge'] else j
+            
+            # Ensure j is within valid range for row
+            if j >= len(row):
+                continue
+            
+            if j == self.col_indices['actual']:  # ACTUAL column as entry
+                # Create key if dimension and item_no indices are valid
+                if (self.col_indices['dimension'] < len(row) and 
+                    self.col_indices['item_no'] < len(row)):
+                    
+                    dimension = row[self.col_indices['dimension']]
+                    item_no = row[self.col_indices['item_no']]
+                    key = f"{dimension}_{item_no}"
+                    
+                    # Create entry widget
+                    entry = ctk.CTkEntry(
+                        self.table_frame, 
+                        width=self.col_widths[j] if j < len(self.col_widths) else 120, 
+                        height=30, 
+                        corner_radius=6,
+                        font=("Helvetica", 14)
+                    )
+                    
+                    # Set initial value - prioritize saved actual_values over the cell content
+                    initial_value = self.actual_values.get(key, "") or cell
+                    entry.insert(0, initial_value)
+                    
+                    # Bind events
+                    entry.bind("<Return>", lambda e, k=key, w=entry: self.update_actual_value(k, w.get()))
+                    entry.bind("<FocusOut>", lambda e, k=key, w=entry: self.update_actual_value(k, w.get()))
+                    
+                    # Store widget reference
+                    self.widgets[key] = entry
+                    
+                    # Add to grid
+                    entry.grid(row=i, column=grid_col, padx=5, pady=5, sticky="nsew")
+                else:
+                    # Fallback if indices are invalid
+                    label = ctk.CTkLabel(
+                        self.table_frame, 
+                        text=cell or "", 
+                        font=("Helvetica", 14),
+                        width=self.col_widths[j] if j < len(self.col_widths) else 120, 
+                        anchor="center", 
+                        corner_radius=6,
+                        bg_color="transparent"
+                    )
+                    label.grid(row=i, column=grid_col, padx=5, pady=5, sticky="nsew")
+            else:
+                # Regular cell as label
+                label = ctk.CTkLabel(
+                    self.table_frame, 
+                    text=cell or "", 
+                    font=("Helvetica", 14),
+                    width=self.col_widths[j] if j < len(self.col_widths) else 120, 
+                    anchor="center", 
+                    corner_radius=6,
+                    bg_color="transparent"
+                )
+                label.grid(row=i, column=grid_col, padx=5, pady=5, sticky="nsew")
+        
+        # Add "Detail" button for Lot Check column if dimension and item_no indices are valid
+        if (self.col_indices['dimension'] < len(row) and 
+            self.col_indices['item_no'] < len(row)):
+            
+            dimension = row[self.col_indices['dimension']]
+            item_no = row[self.col_indices['item_no']]
+            
+            detail_button = ctk.CTkButton(
+                self.table_frame, 
+                text="Detail", 
+                font=("Helvetica", 12),
+                width=self.col_widths[-1] - 20 if len(self.col_widths) > 0 else 100, 
+                height=30, 
+                corner_radius=6,
+                command=lambda r=i, item=item_no, dim=dimension: self.show_lot_detail(r, item, dim)
+            )
+            
+            # Calculate grid column (offset by 1 for checkbox column)
+            detail_grid_col = len(self.headers) - (1 if self.col_indices['badge'] != -1 else 0)
+            
+            detail_button.grid(row=i, column=detail_grid_col, padx=5, pady=5, sticky="nsew")
+    
+    # Configure grid
+    visible_cols = len(self.headers) - (1 if self.col_indices['badge'] != -1 else 0) + 1  # +1 for checkbox col
+    self.table_frame.grid_columnconfigure(0, weight=0, minsize=60)  # Checkbox column
+    for j in range(1, visible_cols):
+        self.table_frame.grid_columnconfigure(j, weight=1, minsize=120)
+    
+    for i in range(len(table)):
+        self.table_frame.grid_rowconfigure(i, weight=1)
