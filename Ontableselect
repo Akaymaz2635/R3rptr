@@ -1,0 +1,34 @@
+def on_table_select(self, choice):
+    """Handle table selection from dropdown"""
+    try:
+        table_idx = int(self.table_selector.get().split()[1]) - 1
+        
+        # Tüm tablolar arasında actual olan tabloları bul
+        valid_tables = []
+        for i, table in enumerate(self.table_reader.table_data):
+            if not table or len(table) < 1:
+                continue
+                
+            # Tablonun başlık satırını al
+            headers = table[0]
+            
+            # ACTUAL sütunu var mı kontrol et
+            has_actual = False
+            for header in headers:
+                if "ACTUAL" in header.upper():
+                    has_actual = True
+                    break
+            
+            if has_actual:
+                valid_tables.append(i)
+        
+        # Seçilen tablo indeksini gerçek tablo indeksine çevir
+        if 0 <= table_idx < len(valid_tables):
+            real_idx = valid_tables[table_idx]
+            self.selected_table_idx = real_idx
+            self.show_table()
+            self.update_report_info()
+        else:
+            logger.error(f"Geçersiz tablo indeksi: {table_idx}")
+    except Exception as e:
+        logger.error(f"Tablo seçme hatası: {str(e)}")
