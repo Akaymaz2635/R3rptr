@@ -1,0 +1,39 @@
+def update_table_selector(self):
+    """Update the table selector dropdown with available tables that have ACTUAL column"""
+    if self.table_reader.table_data:
+        # Önce her tablo için ACTUAL sütunu olup olmadığını kontrol et
+        valid_tables = []
+        for i, table in enumerate(self.table_reader.table_data):
+            if not table or len(table) < 1:  # Boş tabloları atla
+                continue
+                
+            # Tablonun başlık satırını al
+            headers = table[0]
+            
+            # ACTUAL sütunu var mı kontrol et
+            has_actual = False
+            for header in headers:
+                if "ACTUAL" in header.upper():
+                    has_actual = True
+                    break
+            
+            # Eğer ACTUAL sütunu varsa, bu tabloyu geçerli tablolar listesine ekle
+            if has_actual:
+                valid_tables.append(i)
+        
+        # Sadece geçerli tabloları dropdown'a ekle
+        if valid_tables:
+            table_names = [f"Tablo {i+1}" for i in valid_tables]
+            self.table_selector.configure(values=table_names)
+            self.table_selector.set(table_names[0])
+            
+            # Seçili tabloyu güncelle
+            first_valid_idx = valid_tables[0]
+            self.selected_table_idx = first_valid_idx
+        else:
+            # Hiç geçerli tablo yoksa, dropdown'ı temizle
+            self.table_selector.configure(values=[])
+            messagebox.showinfo("Bilgi", "Hiçbir tabloda ACTUAL sütunu bulunamadı.")
+    else:
+        # Hiç tablo verisi yoksa
+        self.table_selector.configure(values=[])
