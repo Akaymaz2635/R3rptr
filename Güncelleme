@@ -1,0 +1,42 @@
+def on_table_select(self, choice):
+    """Handle table selection from dropdown"""
+    try:
+        # Seçilen tablonun gösterilen adını (örn. "Tablo 4") al
+        selected_table_name = self.table_selector.get()
+        
+        # Geçerli tabloların listesini oluştur
+        valid_tables = []
+        for i, table in enumerate(self.table_reader.table_data):
+            if not table or len(table) < 1:
+                continue
+                
+            # Tablonun başlık satırını al
+            headers = table[0]
+            
+            # ACTUAL sütunu var mı kontrol et
+            has_actual = False
+            for header in headers:
+                if "ACTUAL" in header.upper():
+                    has_actual = True
+                    break
+            
+            if has_actual:
+                valid_tables.append(i)
+        
+        # Tablo adını indekse çevir (örn. "Tablo 4" -> 3)
+        # Dropdown'daki indeks 0'dan başlar, ama tablo adları 1'den başlar
+        dropdown_idx = self.table_selector.cget("values").index(selected_table_name)
+        
+        # Dropdown indeksini geçerli tablolar listesindeki indekse çevir
+        if 0 <= dropdown_idx < len(valid_tables):
+            real_idx = valid_tables[dropdown_idx]
+            self.selected_table_idx = real_idx
+            self.show_table()
+            self.update_report_info()
+            logger.info(f"Tablo seçildi: Gösterilen '{selected_table_name}', Gerçek indeks: {real_idx}")
+        else:
+            logger.error(f"Geçersiz dropdown indeksi: {dropdown_idx}, Geçerli tablo sayısı: {len(valid_tables)}")
+    except Exception as e:
+        logger.error(f"Tablo seçme hatası: {str(e)}")
+        # Hata ayıklama için ek bilgi yaz
+        logger.error(f"Seçilen değer: {choice}, Tüm değerler: {self.table_selector.cget('values')}")
